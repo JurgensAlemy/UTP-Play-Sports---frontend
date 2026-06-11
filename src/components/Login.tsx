@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { authService } from '../services/api'
 
 interface LoginProps {
     onLogin: (user: any) => void
@@ -17,11 +18,51 @@ export function Login({ onLogin }: LoginProps) {
     const [isValidating, setIsValidating] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
     const [loginFailed, setLoginFailed] = useState(false)
+    const [showRegister, setShowRegister] = useState(false)
+    const [regData, setRegData] = useState({ nombre: '', email: '', facultad: '' })
+    const [regError, setRegError] = useState('')
+    const [regSuccess, setRegSuccess] = useState('')
+
+    const handleRegister = async () => {
+        setRegError('')
+        setRegSuccess('')
+        if (!regData.nombre || !regData.email || !regData.facultad) {
+            setRegError('Completa todos los campos.')
+            return
+        }
+        if (!regData.email.endsWith('@utp.edu.pe')) {
+            setRegError('El correo debe ser @utp.edu.pe')
+            return
+        }
+        if (!studentId || !/^U\d{7,9}$/i.test(studentId)) {
+            setRegError('Primero ingresa un ID válido (ej: U20191234)')
+            return
+        }
+        if (password.length < 8) {
+            setRegError('La contraseña debe tener al menos 8 caracteres.')
+            return
+        }
+        try {
+            const data = await authService.register({
+                studentId,
+                nombre: regData.nombre,
+                email: regData.email,
+                password,
+                facultad: regData.facultad,
+            })
+            if (data.success) {
+                setRegSuccess('¡Cuenta creada! Ya puedes iniciar sesión.')
+                setShowRegister(false)
+            } else {
+                setRegError(data.message)
+            }
+        } catch {
+            setRegError('Error de conexión con el servidor.')
+        }
+    }
 
     const validate = (): boolean => {
         const newErrors: FormErrors = {}
-
-        // Validar ID estudiante
         if (!studentId) {
             newErrors.studentId = 'El ID de estudiante es obligatorio.'
         } else if (!studentId.toUpperCase().startsWith('U')) {
@@ -29,46 +70,42 @@ export function Login({ onLogin }: LoginProps) {
         } else if (!/^U\d{7,9}$/i.test(studentId)) {
             newErrors.studentId = 'Formato inválido. Ejemplo correcto: U20191234'
         }
-
-        // Validar contraseña
         if (!password) {
             newErrors.password = 'La contraseña es obligatoria.'
         } else if (password.length < 8) {
             newErrors.password = 'La contraseña debe tener al menos 8 caracteres.'
         }
-
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoginFailed(false)
-
         if (!validate()) return
-
         setIsValidating(true)
-
-        setTimeout(() => {
-            // Simulamos credenciales válidas: cualquier U + 8 dígitos con pass >= 8 chars
-            if (/^U\d{7,9}$/i.test(studentId) && password.length >= 8) {
+        try {
+            const data = await authService.login(studentId, password)
+            if (data.success) {
                 onLogin({
-                    studentId: studentId.toUpperCase(),
-                    name: 'Estudiante UTP',
-                    email: `${studentId.toLowerCase()}@utp.edu.pe`,
-                    faculty: 'Ingeniería de Sistemas',
-                    verified: true,
+                    studentId: data.studentId,
+                    name: data.nombre,
+                    email: data.email,
+                    faculty: data.facultad,
+                    verified: data.verificado,
                 })
             } else {
                 setLoginFailed(true)
                 setIsValidating(false)
             }
-        }, 1000)
+        } catch {
+            setLoginFailed(true)
+            setIsValidating(false)
+        }
     }
 
     const handleStudentIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value
-        // Solo permite U/u seguido de números, max 10 chars
         if (/^[Uu]?\d*$/.test(value) && value.length <= 10) {
             setStudentId(value)
             if (errors.studentId) setErrors(prev => ({ ...prev, studentId: undefined }))
@@ -85,7 +122,7 @@ export function Login({ onLogin }: LoginProps) {
             <div className="w-full max-w-md">
                 <div className="bg-white rounded-2xl shadow-xl p-8">
 
-                    {/* Logo UTP */}
+                    {/* Logo */}
                     <div className="text-center mb-8">
                         <div className="inline-flex mb-4">
                             <div className="w-16 h-20 bg-red-600 flex items-center justify-center">
@@ -102,7 +139,7 @@ export function Login({ onLogin }: LoginProps) {
                         <p className="text-gray-600">Gestión de Multicanchas Deportivas</p>
                     </div>
 
-                    {/* Error general de login */}
+                    {/* Error login */}
                     {loginFailed && (
                         <div className="flex items-start gap-2 p-3 mb-4 bg-red-50 border border-red-300 rounded-lg">
                             <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
@@ -112,13 +149,10 @@ export function Login({ onLogin }: LoginProps) {
                         </div>
                     )}
 
+                    {/* Formulario login */}
                     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-
-                        {/* Campo ID Estudiante */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                ID de Estudiante
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">ID de Estudiante</label>
                             <input
                                 type="text"
                                 value={studentId}
@@ -131,18 +165,14 @@ export function Login({ onLogin }: LoginProps) {
                             />
                             {errors.studentId && (
                                 <p className="flex items-center gap-1 mt-1 text-xs text-red-600">
-                                    <AlertCircle size={12} />
-                                    {errors.studentId}
+                                    <AlertCircle size={12} /> {errors.studentId}
                                 </p>
                             )}
                             <p className="mt-1 text-xs text-gray-400">Formato: U seguido de 7 a 9 dígitos</p>
                         </div>
 
-                        {/* Campo Contraseña */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Contraseña
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
                             <div className="relative">
                                 <input
                                     type={showPassword ? 'text' : 'password'}
@@ -164,11 +194,9 @@ export function Login({ onLogin }: LoginProps) {
                             </div>
                             {errors.password && (
                                 <p className="flex items-center gap-1 mt-1 text-xs text-red-600">
-                                    <AlertCircle size={12} />
-                                    {errors.password}
+                                    <AlertCircle size={12} /> {errors.password}
                                 </p>
                             )}
-                            {/* Barra de fuerza de contraseña */}
                             {password.length > 0 && (
                                 <div className="mt-2">
                                     <div className="flex gap-1">
@@ -191,11 +219,10 @@ export function Login({ onLogin }: LoginProps) {
                             )}
                         </div>
 
-                        {/* Botón Submit */}
                         <button
                             type="submit"
                             disabled={isValidating}
-                            className="w-full bg-gradient-to-r from-red-600 to-black text-white font-semibold py-3 rounded-lg hover:from-red-700 hover:to-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                            className="w-full bg-gradient-to-r from-red-600 to-black text-white font-semibold py-3 rounded-lg hover:from-red-700 hover:to-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isValidating ? (
                                 <span className="flex items-center justify-center gap-2">
@@ -209,7 +236,73 @@ export function Login({ onLogin }: LoginProps) {
                         </button>
                     </form>
 
-                    {/* Info validación */}
+                    {/* Sección registro — dentro del card */}
+                    {!showRegister ? (
+                        <p className="text-center text-sm text-gray-500 mt-4">
+                            ¿No tienes cuenta?{' '}
+                            <button
+                                type="button"
+                                onClick={() => setShowRegister(true)}
+                                className="text-red-600 hover:text-red-700 font-medium"
+                            >
+                                Regístrate aquí
+                            </button>
+                        </p>
+                    ) : (
+                        <div className="mt-6 p-4 border border-gray-200 rounded-xl space-y-3 bg-gray-50">
+                            <h3 className="font-bold text-gray-800">Crear cuenta</h3>
+                            <p className="text-xs text-gray-500">Usa el ID y contraseña que escribiste arriba</p>
+                            <input
+                                type="text"
+                                placeholder="Nombre completo"
+                                value={regData.nombre}
+                                onChange={e => setRegData({ ...regData, nombre: e.target.value })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                            />
+                            <input
+                                type="email"
+                                placeholder="Correo (@utp.edu.pe)"
+                                value={regData.email}
+                                onChange={e => setRegData({ ...regData, email: e.target.value })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                            />
+                            <input
+                                type="text"
+                                placeholder="Facultad"
+                                value={regData.facultad}
+                                onChange={e => setRegData({ ...regData, facultad: e.target.value })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                            />
+                            {regError && (
+                                <p className="flex items-center gap-1 text-xs text-red-600">
+                                    <AlertCircle size={12} /> {regError}
+                                </p>
+                            )}
+                            {regSuccess && (
+                                <p className="flex items-center gap-1 text-xs text-green-600">
+                                    <CheckCircle size={12} /> {regSuccess}
+                                </p>
+                            )}
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowRegister(false); setRegError(''); setRegSuccess('') }}
+                                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleRegister}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700"
+                                >
+                                    Registrarme
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Validación estudiantil */}
                     <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                         <div className="flex items-start gap-2">
                             <CheckCircle className="text-red-600 flex-shrink-0 mt-0.5" size={18} />
@@ -220,12 +313,6 @@ export function Login({ onLogin }: LoginProps) {
                         </div>
                     </div>
 
-                    <p className="text-center text-sm text-gray-500 mt-4">
-                        ¿Problemas para acceder?{' '}
-                        <button className="text-red-600 hover:text-red-700 font-medium">
-                            Contacta soporte
-                        </button>
-                    </p>
                 </div>
             </div>
         </div>

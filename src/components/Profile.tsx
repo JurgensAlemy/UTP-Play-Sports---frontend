@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { User, Mail, GraduationCap, Trophy, Calendar, Star, Edit, Save, X } from 'lucide-react'
+import { usuarioService } from '../services/api'
 
 interface ProfileProps {
     user: any
@@ -7,14 +8,39 @@ interface ProfileProps {
 
 export function Profile({ user }: ProfileProps) {
     const [isEditing, setIsEditing] = useState(false)
+    const [loading, setLoading] = useState(true)
     const [formData, setFormData] = useState({
-        name: user?.name || '',
-        email: user?.email || '',
-        faculty: user?.faculty || '',
+        name: '',
+        email: '',
+        faculty: '',
         favoriteSport: 'Fútbol',
         skillLevel: 'Intermedio',
     })
 
+    useEffect(() => {
+        usuarioService.getPerfil(user.studentId).then((data) => {
+            setFormData({
+                name: data.nombre || '',
+                email: data.email || '',
+                faculty: data.facultad || '',
+                favoriteSport: data.deporteFavorito || 'Fútbol',
+                skillLevel: data.nivelHabilidad || 'Intermedio',
+            })
+            setLoading(false)
+        }).catch(() => setLoading(false))
+    }, [user.studentId])
+
+    const handleSave = async () => {
+        await usuarioService.actualizarPerfil(user.studentId, {
+            nombre: formData.name,
+            facultad: formData.faculty,
+            deporteFavorito: formData.favoriteSport,
+            nivelHabilidad: formData.skillLevel,
+        })
+        setIsEditing(false)
+    }
+
+    const handleCancel = () => setIsEditing(false)
     const stats = [
         { label: 'Partidos Jugados', value: 24, icon: Trophy },
         { label: 'Horas Totales', value: 48, icon: Calendar },
@@ -36,17 +62,12 @@ export function Profile({ user }: ProfileProps) {
         { id: 6, name: 'Todoterreno', description: 'Juega 5 deportes diferentes', icon: '🏆', unlocked: false },
     ]
 
-    const handleSave = () => setIsEditing(false)
-
-    const handleCancel = () => {
-        setFormData({
-            name: user?.name || '',
-            email: user?.email || '',
-            faculty: user?.faculty || '',
-            favoriteSport: 'Fútbol',
-            skillLevel: 'Intermedio',
-        })
-        setIsEditing(false)
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+            </div>
+        )
     }
 
     return (
