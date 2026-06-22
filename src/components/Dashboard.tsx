@@ -1,7 +1,7 @@
-import { Calendar, Users, Trophy, TrendingUp, MapPin, Clock } from 'lucide-react'
+import { Calendar, Trophy, Clock, MapPin, ChevronRight, Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { reservaService } from '../services/api'
+import { reservaService, matchmakingService } from '../services/api'
 
 interface DashboardProps {
     user: any
@@ -9,143 +9,147 @@ interface DashboardProps {
 
 export function Dashboard({ user }: DashboardProps) {
     const [reservasActivas, setReservasActivas] = useState<any[]>([])
+    const [conexiones, setConexiones] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        reservaService.getReservasByUsuario(user.studentId)
-            .then(data => {
-                const activas = Array.isArray(data) ? data.filter((r: any) => r.estado === 'CONFIRMADA') : []
-                setReservasActivas(activas)
+        Promise.all([
+            reservaService.getReservasByUsuario(user.studentId),
+            matchmakingService.getConexiones(user.studentId),
+        ])
+            .then(([reservas, conex]) => {
+                setReservasActivas(Array.isArray(reservas) ? reservas.filter((r: any) => r.estado === 'CONFIRMADA') : [])
+                setConexiones(Array.isArray(conex) ? conex : [])
             })
             .catch(() => { })
             .finally(() => setLoading(false))
     }, [user.studentId])
 
-    const stats = [
-        { label: 'Reservas Activas', value: loading ? '...' : String(reservasActivas.length), icon: Calendar },
-        { label: 'Partidos Jugados', value: '24', icon: Trophy },
-        { label: 'Amigos Conectados', value: '18', icon: Users },
-        { label: 'Horas Jugadas', value: `${reservasActivas.length}h`, icon: Clock },
-    ]
+    const horasJugadas = reservasActivas.length
+    const proximaReserva = reservasActivas
+        .slice()
+        .sort((a, b) => new Date(a.fecha + 'T' + a.horario).getTime() - new Date(b.fecha + 'T' + b.horario).getTime())[0]
 
-    const matchmakingRequests = [
-        { id: 1, user: 'Carlos M.', sport: 'Fútbol', level: 'Intermedio', time: 'Hace 2 horas' },
-        { id: 2, user: 'Ana G.', sport: 'Básquetbol', level: 'Avanzado', time: 'Hace 5 horas' },
-    ]
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-[60vh]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+            </div>
+        )
+    }
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                    Bienvenido, {user?.name?.split(' ')[0]}
+        <div className="space-y-5 lg:space-y-8">
+            {/* Header Hero al estilo Login */}
+            <div className="bg-gradient-to-br from-red-600 to-black rounded-3xl p-6 lg:p-10 text-white shadow-xl">
+                <h1 className="text-2xl lg:text-4xl font-black tracking-tight mb-1 lg:mb-2">
+                    Hola, {user?.name?.split(' ')[0]} 👋
                 </h1>
-                <p className="text-gray-600">Gestiona tus reservas y encuentra compañeros de juego</p>
+                <p className="text-red-100 text-sm lg:text-base opacity-90">¿Listo para jugar hoy?</p>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {stats.map((stat) => {
-                    const Icon = stat.icon
-                    return (
-                        <div key={stat.label} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center">
-                                    <Icon className="text-red-500" size={24} />
-                                </div>
-                                <TrendingUp className="text-green-500" size={18} />
-                            </div>
-                            <p className="text-3xl font-bold text-gray-800 mb-1">{stat.value}</p>
-                            <p className="text-sm text-gray-600">{stat.label}</p>
-                        </div>
-                    )
-                })}
+            {/* Stats con Glassmorphism */}
+            <div className="flex lg:grid lg:grid-cols-3 gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 scrollbar-hide">
+                <div className="flex-shrink-0 lg:flex-shrink bg-white/70 dark:bg-[#1a1a1a]/70 backdrop-blur-xl rounded-3xl border border-white/50 dark:border-white/5 shadow-sm px-5 py-4 lg:p-6 min-w-[120px] lg:min-w-0">
+                    <Calendar className="text-red-600 dark:text-red-500 mb-2" size={20} />
+                    <p className="text-2xl lg:text-3xl font-black text-gray-900 dark:text-white">{reservasActivas.length}</p>
+                    <p className="text-xs lg:text-sm font-medium text-gray-500 dark:text-gray-400">Reservas activas</p>
+                </div>
+                <div className="flex-shrink-0 lg:flex-shrink bg-white/70 dark:bg-[#1a1a1a]/70 backdrop-blur-xl rounded-3xl border border-white/50 dark:border-white/5 shadow-sm px-5 py-4 lg:p-6 min-w-[120px] lg:min-w-0">
+                    <Clock className="text-red-600 dark:text-red-500 mb-2" size={20} />
+                    <p className="text-2xl lg:text-3xl font-black text-gray-900 dark:text-white">{horasJugadas}h</p>
+                    <p className="text-xs lg:text-sm font-medium text-gray-500 dark:text-gray-400">Próximas horas</p>
+                </div>
+                <div className="flex-shrink-0 lg:flex-shrink bg-white/70 dark:bg-[#1a1a1a]/70 backdrop-blur-xl rounded-3xl border border-white/50 dark:border-white/5 shadow-sm px-5 py-4 lg:p-6 min-w-[120px] lg:min-w-0">
+                    <Trophy className="text-red-600 dark:text-red-500 mb-2" size={20} />
+                    <p className="text-2xl lg:text-3xl font-black text-gray-900 dark:text-white">{conexiones.length}</p>
+                    <p className="text-xs lg:text-sm font-medium text-gray-500 dark:text-gray-400">Conexiones</p>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Próximas reservas reales */}
-                <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-bold text-gray-800">Próximas Reservas</h2>
-                        <Link to="/reservations" className="text-red-600 hover:text-red-700 font-medium text-sm">
-                            Ver todas
-                        </Link>
-                    </div>
-
-                    {loading ? (
-                        <div className="flex items-center justify-center h-32">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-                        </div>
-                    ) : reservasActivas.length === 0 ? (
-                        <div className="text-center py-10">
-                            <Calendar className="mx-auto text-gray-300 mb-3" size={48} />
-                            <p className="text-gray-500 font-medium">No tienes reservas activas</p>
-                            <Link
-                                to="/reservations"
-                                className="inline-block mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
-                            >
-                                Reservar ahora
+            <div className="lg:grid lg:grid-cols-3 lg:gap-6 space-y-5 lg:space-y-0">
+                <div className="lg:col-span-2">
+                    <div className="flex items-center justify-between mb-3 lg:mb-4">
+                        <h2 className="font-bold text-gray-900 dark:text-white text-base lg:text-lg">Tu próxima reserva</h2>
+                        {reservasActivas.length > 0 && (
+                            <Link to="/reservations" className="text-red-600 dark:text-red-400 text-xs lg:text-sm font-bold flex items-center gap-0.5 hover:text-red-700 dark:hover:text-red-300 transition-colors">
+                                Ver todas <ChevronRight size={16} />
                             </Link>
-                        </div>
+                        )}
+                    </div>
+                    {!proximaReserva ? (
+                        <Link
+                            to="/reservations"
+                            className="flex flex-col items-center justify-center gap-3 bg-white/50 dark:bg-[#1a1a1a]/50 backdrop-blur-md border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-3xl py-10 lg:py-16 hover:border-red-400 dark:hover:border-red-500 active:scale-[0.98] transition-all group"
+                        >
+                            <div className="w-12 h-12 lg:w-16 lg:h-16 bg-white dark:bg-gray-800 shadow-sm rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Plus className="text-red-600" size={24} />
+                            </div>
+                            <div className="text-center">
+                                <p className="text-sm lg:text-base font-bold text-gray-900 dark:text-white">No tienes reservas</p>
+                                <p className="text-xs lg:text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Toca para separar una cancha</p>
+                            </div>
+                        </Link>
                     ) : (
-                        <div className="space-y-3">
-                            {reservasActivas.slice(0, 3).map((r) => (
-                                <div key={r.id} className="p-4 border border-gray-200 rounded-lg hover:border-red-300 hover:bg-red-50 transition-all">
-                                    <div className="flex items-start justify-between mb-3">
-                                        <div>
-                                            <h3 className="font-semibold text-gray-800 mb-1">{r.deporte}</h3>
-                                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                <MapPin size={14} />
-                                                <span>{r.cancha}</span>
-                                            </div>
-                                        </div>
-                                        <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                                            {r.estado}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                                        <div className="flex items-center gap-1">
-                                            <Calendar size={14} />
-                                            <span>{new Date(r.fecha).toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <Clock size={14} />
-                                            <span>{r.horario}</span>
-                                        </div>
-                                    </div>
+                        <Link
+                            to="/reservations"
+                            className="block bg-white/80 dark:bg-[#1a1a1a]/80 backdrop-blur-xl border border-white/50 dark:border-white/5 rounded-3xl p-5 lg:p-7 shadow-sm hover:shadow-md active:scale-[0.98] transition-all"
+                        >
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <span className="inline-block px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full text-[10px] lg:text-xs font-bold mb-3">
+                                        {proximaReserva.deporte}
+                                    </span>
+                                    <p className="font-black text-xl lg:text-3xl text-gray-900 dark:text-white">{proximaReserva.cancha}</p>
                                 </div>
-                            ))}
-                        </div>
+                                <span className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-[10px] lg:text-xs font-bold">
+                                    {proximaReserva.estado}
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-4 lg:gap-6 mt-6 pt-5 border-t border-gray-100 dark:border-gray-800 text-sm lg:text-base text-gray-600 dark:text-gray-300 font-medium">
+                                <div className="flex items-center gap-2">
+                                    <Calendar className="text-red-600" size={16} />
+                                    <span>{new Date(proximaReserva.fecha).toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Clock className="text-red-600" size={16} />
+                                    <span>{proximaReserva.horario}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <MapPin className="text-red-600" size={16} />
+                                    <span>{proximaReserva.cancha}</span>
+                                </div>
+                            </div>
+                        </Link>
                     )}
                 </div>
 
-                {/* Matchmaking (mock por ahora) */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-bold text-gray-800">Matchmaking</h2>
-                        <Link to="/matchmaking" className="text-red-600 hover:text-red-700 font-medium text-sm">
-                            Ver más
-                        </Link>
-                    </div>
-                    <div className="space-y-3">
-                        {matchmakingRequests.map((request) => (
-                            <div key={request.id} className="p-4 border border-gray-200 rounded-lg hover:border-red-300 hover:bg-red-50 transition-all cursor-pointer">
-                                <div className="flex items-start justify-between mb-2">
-                                    <div>
-                                        <p className="font-semibold text-gray-800">{request.user}</p>
-                                        <p className="text-sm text-gray-600">{request.sport}</p>
-                                    </div>
-                                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                                        {request.level}
-                                    </span>
-                                </div>
-                                <p className="text-xs text-gray-500">{request.time}</p>
+                <div>
+                    <h2 className="font-bold text-gray-900 dark:text-white text-base lg:text-lg mb-3 lg:mb-4">Accesos rápidos</h2>
+                    <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+                        <Link
+                            to="/reservations"
+                            className="bg-white/70 dark:bg-[#1a1a1a]/70 backdrop-blur-xl border border-white/50 dark:border-white/5 shadow-sm rounded-3xl p-4 lg:p-5 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 hover:border-red-300 dark:hover:border-red-500 active:scale-[0.98] transition-all"
+                        >
+                            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-red-50 dark:bg-red-900/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+                                <Calendar className="text-red-600" size={20} />
                             </div>
-                        ))}
+                            <div>
+                                <p className="text-sm font-bold text-gray-900 dark:text-white">Reservar</p>
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Cancha disponible</p>
+                            </div>
+                        </Link>
                         <Link
                             to="/matchmaking"
-                            className="block w-full py-3 text-center bg-gradient-to-r from-red-600 to-black text-white font-semibold rounded-lg hover:from-red-700 hover:to-gray-900 transition-all"
+                            className="bg-white/70 dark:bg-[#1a1a1a]/70 backdrop-blur-xl border border-white/50 dark:border-white/5 shadow-sm rounded-3xl p-4 lg:p-5 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 hover:border-red-300 dark:hover:border-red-500 active:scale-[0.98] transition-all"
                         >
-                            Buscar Compañeros
+                            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-red-50 dark:bg-red-900/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+                                <Trophy className="text-red-600" size={20} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-gray-900 dark:text-white">Matchmaking</p>
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Busca compañeros</p>
+                            </div>
                         </Link>
                     </div>
                 </div>

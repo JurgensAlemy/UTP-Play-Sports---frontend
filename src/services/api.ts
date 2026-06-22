@@ -81,3 +81,65 @@ export const usuarioService = {
         return res.json()
     },
 }
+
+export const matchmakingService = {
+    async getSolicitudesActivas() {
+        const res = await fetch(`${API_URL}/matchmaking/solicitudes`)
+        return res.json()
+    },
+
+    async getSolicitudesByUsuario(studentId: string) {
+        const res = await fetch(`${API_URL}/matchmaking/solicitudes/usuario/${studentId}`)
+        return res.json()
+    },
+
+    async crearSolicitud(data: {
+        studentId: string
+        deporte: string
+        nivel: string
+        disponibilidad: string
+        descripcion: string
+    }) {
+        const res = await fetch(`${API_URL}/matchmaking/solicitudes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        })
+        return res.json()
+    },
+
+    async cerrarSolicitud(id: number, studentId: string) {
+        const res = await fetch(`${API_URL}/matchmaking/solicitudes/${id}/usuario/${studentId}`, {
+            method: 'DELETE',
+        })
+        return res.text()
+    },
+
+    async conectar(solicitudId: number, studentId: string, mensaje?: string) {
+        const res = await fetch(`${API_URL}/matchmaking/conectar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ solicitudId, studentId, mensaje: mensaje || '' }),
+        })
+        return res.json()
+    },
+
+    async getConexiones(studentId: string) {
+        const res = await fetch(`${API_URL}/matchmaking/conexiones/usuario/${studentId}`)
+        return res.json()
+    },
+
+    async getSolicitudesRecibidas(studentId: string) {
+        const res = await fetch(`${API_URL}/matchmaking/conexiones/recibidas/${studentId}`)
+        return res.json()
+    },
+
+    async responderConexion(conexionId: number, studentId: string, estado: 'ACEPTADA' | 'RECHAZADA') {
+        const res = await fetch(`${API_URL}/matchmaking/conexiones/${conexionId}/responder`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ studentId, estado }),
+        })
+        return res.json()
+    },
+}
