@@ -59,11 +59,27 @@ export const reservaService = {
         })
         return res.text()
     },
+
+    async eliminarReserva(reservaId: number, studentId: string) {
+        const res = await fetch(`${API_URL}/reservas/${reservaId}?studentId=${studentId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        if (!res.ok) throw new Error(await res.text())
+        return res.text() // ✅ CAMBIAR .json() POR .text()
+    }
 }
 
 export const usuarioService = {
     async getPerfil(studentId: string) {
         const res = await fetch(`${API_URL}/usuarios/${studentId}`)
+        return res.json()
+    },
+
+    async buscarUsuarios(query: string, excluirStudentId?: string) {
+        const params = new URLSearchParams({ q: query })
+        if (excluirStudentId) params.append('excluir', excluirStudentId)
+        const res = await fetch(`${API_URL}/usuarios/buscar?${params.toString()}`)
         return res.json()
     },
 
@@ -77,6 +93,16 @@ export const usuarioService = {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(datos),
+        })
+        return res.json()
+    },
+
+    async subirFoto(studentId: string, foto: File) {
+        const formData = new FormData()
+        formData.append('foto', foto)
+        const res = await fetch(`${API_URL}/usuarios/${studentId}/foto`, {
+            method: 'POST',
+            body: formData,
         })
         return res.json()
     },
@@ -141,5 +167,37 @@ export const matchmakingService = {
             body: JSON.stringify({ studentId, estado }),
         })
         return res.json()
+    },
+
+    async eliminarConexion(conexionId: number, studentId: string) {
+        const res = await fetch(`${API_URL}/matchmaking/conexiones/${conexionId}/usuario/${studentId}`, {
+            method: 'DELETE',
+        })
+        return res.text()
+    },
+}
+
+export const chatService = {
+    async getMensajes(conexionId: number, studentId: string) {
+        const res = await fetch(`${API_URL}/chat/conexion/${conexionId}/usuario/${studentId}`)
+        return res.json()
+    },
+
+    async enviarMensaje(conexionId: number, studentId: string, contenido?: string, imagen?: File) {
+        const formData = new FormData()
+        if (contenido) formData.append('contenido', contenido)
+        if (imagen) formData.append('imagen', imagen)
+        const res = await fetch(`${API_URL}/chat/conexion/${conexionId}/usuario/${studentId}`, {
+            method: 'POST',
+            body: formData,
+        })
+        return res.json()
+    },
+
+    async eliminarMensaje(mensajeId: number, studentId: string) {
+        const res = await fetch(`${API_URL}/chat/${mensajeId}/usuario/${studentId}`, {
+            method: 'DELETE',
+        })
+        return res.text()
     },
 }

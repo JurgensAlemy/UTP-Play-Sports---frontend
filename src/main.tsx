@@ -4,12 +4,15 @@ import './index.css'
 import App from './App'
 import { ThemeProvider } from './components/ThemeProvider'
 import { ToastProvider } from './components/Toast'
+import { UnreadProvider } from './components/UnreadContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
       <ToastProvider>
-        <App />
+        <UnreadProvider>
+          <App />
+        </UnreadProvider>
       </ToastProvider>
     </ThemeProvider>
   </StrictMode>,

@@ -2,6 +2,7 @@ import { Calendar, Trophy, Clock, MapPin, ChevronRight, Plus } from 'lucide-reac
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { reservaService, matchmakingService } from '../services/api'
+import { LiveMatch } from './LiveMatch'
 
 interface DashboardProps {
     user: any
@@ -47,6 +48,16 @@ export function Dashboard({ user }: DashboardProps) {
                 </h1>
                 <p className="text-red-100 text-sm lg:text-base opacity-90">¿Listo para jugar hoy?</p>
             </div>
+
+            <div className="bg-gradient-to-br from-red-600 to-black rounded-3xl p-6 lg:p-10 text-white shadow-xl">
+                <h1 className="text-2xl lg:text-4xl font-black tracking-tight mb-1 lg:mb-2">
+                    Hola, {user?.name?.split(' ')[0]} 👋
+                </h1>
+                <p className="text-red-100 text-sm lg:text-base opacity-90">¿Listo para jugar hoy?</p>
+            </div>
+
+            {/* Partido en vivo — solo aparece si hay alguno en curso ahora mismo */}
+            <LiveMatch />
 
             {/* Stats con Glassmorphism */}
             <div className="flex lg:grid lg:grid-cols-3 gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 scrollbar-hide">
