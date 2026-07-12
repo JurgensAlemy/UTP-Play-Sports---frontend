@@ -19,19 +19,8 @@ export function SplashScreen({ onDone }: SplashScreenProps) {
             }`}>
             <div className={`flex flex-col items-center gap-4 transition-transform duration-500 ${phase === 'in' ? 'scale-75 opacity-0' : 'scale-100 opacity-100'
                 }`}>
-                <div className="flex rounded-2xl overflow-hidden shadow-2xl">
-                    <div className="w-16 h-20 bg-red-600 flex items-center justify-center">
-                        <span className="text-white font-black text-3xl">U</span>
-                    </div>
-                    <div className="w-16 h-20 bg-black flex items-center justify-center">
-                        <span className="text-white font-black text-3xl">T</span>
-                    </div>
-                    <div className="w-16 h-20 bg-red-600 flex items-center justify-center">
-                        <span className="text-white font-black text-3xl">P</span>
-                    </div>
-                </div>
+                <img src="/utp-play.png" alt="UTP Play" className="w-72 sm:w-80 object-contain" style={{ filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.3))' }} />
                 <div className="text-center">
-                    <h1 className="text-4xl font-black text-white tracking-tight">UTP Play</h1>
                     <p className="text-red-200 text-sm mt-1">Gestión de Multicanchas Deportivas</p>
                 </div>
                 <div className="flex gap-1.5 mt-4">

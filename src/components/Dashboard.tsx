@@ -8,28 +8,79 @@ interface DashboardProps {
     user: any
 }
 
+const parseHorario = (horario: string) => {
+    const partes = horario.split('-').map(p => p.trim())
+    return partes.length === 2 ? { inicio: partes[0], fin: partes[1] } : null
+}
+
+const combinarFechaHora = (fecha: string, hora: string) => {
+    const [h, m] = hora.split(':').map(Number)
+    const d = new Date(fecha + 'T00:00:00')
+    d.setHours(h, m, 0, 0)
+    return d
+}
+
+const getInicioFin = (fecha: string, horario: string) => {
+    const rango = parseHorario(horario)
+    if (!rango) return null
+    return { inicio: combinarFechaHora(fecha, rango.inicio), fin: combinarFechaHora(fecha, rango.fin) }
+}
+
+const estaEnCurso = (fecha: string, horario: string) => {
+    const rango = getInicioFin(fecha, horario)
+    if (!rango) return false
+    const now = new Date()
+    return now >= rango.inicio && now <= rango.fin
+}
+
+const yaVencio = (fecha: string, horario: string) => {
+    const rango = getInicioFin(fecha, horario)
+    if (!rango) return false
+    return new Date() > rango.fin
+}
+
 export function Dashboard({ user }: DashboardProps) {
     const [reservasActivas, setReservasActivas] = useState<any[]>([])
     const [conexiones, setConexiones] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
+    const cargarDatos = () => {
         Promise.all([
             reservaService.getReservasByUsuario(user.studentId),
             matchmakingService.getConexiones(user.studentId),
         ])
             .then(([reservas, conex]) => {
-                setReservasActivas(Array.isArray(reservas) ? reservas.filter((r: any) => r.estado === 'CONFIRMADA') : [])
+                const activas = Array.isArray(reservas) ? reservas.filter((r: any) => r.estado === 'CONFIRMADA') : []
+                setReservasActivas(activas)
                 setConexiones(Array.isArray(conex) ? conex : [])
+
+                // Limpieza automática: borra del historial las reservas confirmadas cuyo bloque ya pasó
+                const vencidas = activas.filter((r: any) => yaVencio(r.fecha, r.horario))
+                if (vencidas.length > 0) {
+                    Promise.all(vencidas.map((r: any) => reservaService.eliminarReserva(r.id, user.studentId).catch(() => { })))
+                        .then(() => {
+                            // Recarga silenciosa tras limpiar, sin pedir confirmación al usuario
+                            reservaService.getReservasByUsuario(user.studentId).then((res: any) => {
+                                setReservasActivas(Array.isArray(res) ? res.filter((r: any) => r.estado === 'CONFIRMADA') : [])
+                            })
+                        })
+                }
             })
             .catch(() => { })
             .finally(() => setLoading(false))
+    }
+
+    useEffect(() => {
+        cargarDatos()
+        // Revisa cada minuto si alguna reserva venció, para que se vaya borrando sola sin recargar la página
+        const t = setInterval(cargarDatos, 60000)
+        return () => clearInterval(t)
     }, [user.studentId])
 
     const horasJugadas = reservasActivas.length
     const proximaReserva = reservasActivas
         .slice()
-        .sort((a, b) => new Date(a.fecha + 'T' + a.horario).getTime() - new Date(b.fecha + 'T' + b.horario).getTime())[0]
+        .sort((a, b) => new Date(a.fecha + 'T' + a.horario.split('-')[0].trim()).getTime() - new Date(b.fecha + 'T' + b.horario.split('-')[0].trim()).getTime())[0]
 
     if (loading) {
         return (
@@ -39,16 +90,11 @@ export function Dashboard({ user }: DashboardProps) {
         )
     }
 
+    const enCurso = proximaReserva ? estaEnCurso(proximaReserva.fecha, proximaReserva.horario) : false
+
     return (
         <div className="space-y-5 lg:space-y-8">
             {/* Header Hero al estilo Login */}
-            <div className="bg-gradient-to-br from-red-600 to-black rounded-3xl p-6 lg:p-10 text-white shadow-xl">
-                <h1 className="text-2xl lg:text-4xl font-black tracking-tight mb-1 lg:mb-2">
-                    Hola, {user?.name?.split(' ')[0]} 👋
-                </h1>
-                <p className="text-red-100 text-sm lg:text-base opacity-90">¿Listo para jugar hoy?</p>
-            </div>
-
             <div className="bg-gradient-to-br from-red-600 to-black rounded-3xl p-6 lg:p-10 text-white shadow-xl">
                 <h1 className="text-2xl lg:text-4xl font-black tracking-tight mb-1 lg:mb-2">
                     Hola, {user?.name?.split(' ')[0]} 👋
@@ -113,14 +159,21 @@ export function Dashboard({ user }: DashboardProps) {
                                     </span>
                                     <p className="font-black text-xl lg:text-3xl text-gray-900 dark:text-white">{proximaReserva.cancha}</p>
                                 </div>
-                                <span className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-[10px] lg:text-xs font-bold">
-                                    {proximaReserva.estado}
-                                </span>
+                                {enCurso ? (
+                                    <span className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-full text-[10px] lg:text-xs font-bold uppercase">
+                                        <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                                        En curso
+                                    </span>
+                                ) : (
+                                    <span className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-[10px] lg:text-xs font-bold">
+                                        {proximaReserva.estado}
+                                    </span>
+                                )}
                             </div>
                             <div className="flex flex-wrap items-center gap-4 lg:gap-6 mt-6 pt-5 border-t border-gray-100 dark:border-gray-800 text-sm lg:text-base text-gray-600 dark:text-gray-300 font-medium">
                                 <div className="flex items-center gap-2">
                                     <Calendar className="text-red-600" size={16} />
-                                    <span>{new Date(proximaReserva.fecha).toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}</span>
+                                    <span>{new Date(proximaReserva.fecha + 'T00:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Clock className="text-red-600" size={16} />

@@ -27,6 +27,32 @@ const BLOQUES = [
 
 const labelBloque = (b: { inicio: string; fin: string }) => `${b.inicio} - ${b.fin}`
 
+const combinarFechaHora = (fecha: string, hora: string) => {
+    const [h, m] = hora.split(':').map(Number)
+    const d = new Date(fecha + 'T00:00:00')
+    d.setHours(h, m, 0, 0)
+    return d
+}
+
+const getInicioFinReserva = (fecha: string, horario: string) => {
+    const partes = horario.split('-').map(p => p.trim())
+    if (partes.length !== 2) return null
+    return { inicio: combinarFechaHora(fecha, partes[0]), fin: combinarFechaHora(fecha, partes[1]) }
+}
+
+const estaEnCursoReserva = (fecha: string, horario: string) => {
+    const rango = getInicioFinReserva(fecha, horario)
+    if (!rango) return false
+    const now = new Date()
+    return now >= rango.inicio && now <= rango.fin
+}
+
+const yaVencioReserva = (fecha: string, horario: string) => {
+    const rango = getInicioFinReserva(fecha, horario)
+    if (!rango) return false
+    return new Date() > rango.fin
+}
+
 export function Reservations({ user }: ReservationsProps) {
 
     const confirmarEliminacion = async () => {
@@ -80,6 +106,32 @@ export function Reservations({ user }: ReservationsProps) {
 
     useEffect(() => {
         reservaService.getReservasByUsuario(user.studentId).then(setReservasDB).catch(() => { })
+    }, [user.studentId])
+
+    useEffect(() => {
+        reservaService.getReservasByUsuario(user.studentId).then((data: any) => {
+            setReservasDB(data)
+            // Limpieza automática: borra sin preguntar las reservas confirmadas cuyo bloque ya terminó
+            const lista = Array.isArray(data) ? data : []
+            const vencidas = lista.filter((r: any) => r.estado === 'CONFIRMADA' && yaVencioReserva(r.fecha, r.horario))
+            if (vencidas.length > 0) {
+                Promise.all(vencidas.map((r: any) => reservaService.eliminarReserva(r.id, user.studentId).catch(() => { })))
+                    .then(() => refrescarReservas())
+            }
+        }).catch(() => { })
+
+        // Revisa cada minuto por si una reserva venció mientras el usuario sigue en la pantalla
+        const t = setInterval(() => {
+            reservaService.getReservasByUsuario(user.studentId).then((data: any) => {
+                const lista = Array.isArray(data) ? data : []
+                const vencidas = lista.filter((r: any) => r.estado === 'CONFIRMADA' && yaVencioReserva(r.fecha, r.horario))
+                if (vencidas.length > 0) {
+                    Promise.all(vencidas.map((r: any) => reservaService.eliminarReserva(r.id, user.studentId).catch(() => { })))
+                        .then(() => refrescarReservas())
+                }
+            }).catch(() => { })
+        }, 60000)
+        return () => clearInterval(t)
     }, [user.studentId])
 
     useEffect(() => {
@@ -407,9 +459,16 @@ export function Reservations({ user }: ReservationsProps) {
                                     <div className="w-10 h-10 bg-red-50 dark:bg-red-900/20 rounded-xl flex items-center justify-center">
                                         <MapPin className="text-red-600" size={18} />
                                     </div>
-                                    <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-[10px] font-bold">
-                                        {r.estado}
-                                    </span>
+                                    {estaEnCursoReserva(r.fecha, r.horario) ? (
+                                        <span className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-full text-[10px] font-bold uppercase">
+                                            <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                                            En curso
+                                        </span>
+                                    ) : (
+                                        <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-[10px] font-bold">
+                                            {r.estado}
+                                        </span>
+                                    )}
                                 </div>
                                 <p className="font-black text-gray-900 dark:text-white text-base">{r.cancha}</p>
                                 <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-4">{r.deporte} · {format(new Date(r.fecha + 'T00:00:00'), 'dd MMM', { locale: es })} · {r.horario}</p>
@@ -642,13 +701,6 @@ export function Reservations({ user }: ReservationsProps) {
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
-
-            {/* Modal Confirmación de CANCELACIÓN */}
-            {showCancelModal && reservaACancelar && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end lg:items-center justify-center z-50 p-4">
-                    {/* ... (todo el código del modal de cancelar que ya tenías) ... */}
                 </div>
             )}
 

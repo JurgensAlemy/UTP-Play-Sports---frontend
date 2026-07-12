@@ -72,22 +72,14 @@ export function Login({ onLogin, onGoToRegister }: LoginProps) {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
             {/* Hero superior */}
-            <div className="bg-gradient-to-br from-red-600 to-black flex-shrink-0 pt-16 pb-12 px-6 text-center">
-                <div className="flex justify-center mb-4">
-                    <div className="flex rounded-xl overflow-hidden shadow-lg">
-                        <div className="w-12 h-14 bg-red-600 border-r border-red-500 flex items-center justify-center">
-                            <span className="text-white font-black text-xl">U</span>
-                        </div>
-                        <div className="w-12 h-14 bg-black flex items-center justify-center">
-                            <span className="text-white font-black text-xl">T</span>
-                        </div>
-                        <div className="w-12 h-14 bg-red-600 border-l border-red-500 flex items-center justify-center">
-                            <span className="text-white font-black text-xl">P</span>
-                        </div>
-                    </div>
-                </div>
-                <h1 className="text-3xl font-black text-white tracking-tight">UTP Play</h1>
-                <p className="text-red-200 text-sm mt-1">Gestión de Multicanchas Deportivas</p>
+            <div className="bg-gradient-to-br from-red-600 to-black flex-shrink-0 px-6 text-center flex flex-col items-center justify-center" style={{ height: '250px' }}>
+                <img
+                    src="/utp-play.png"
+                    alt="UTP Play"
+                    className="object-contain mx-auto"
+                    style={{ height: '250px', filter: 'drop-shadow(0 0 16px rgba(255,255,255,0.25))' }}
+                />
+                <p className="text-red-200 text-sm mt-3">Gestión de Multicanchas Deportivas</p>
             </div>
 
             {/* Card del formulario */}
@@ -113,8 +105,8 @@ export function Login({ onLogin, onGoToRegister }: LoginProps) {
                             onChange={handleStudentIdChange}
                             placeholder="U20191234"
                             className={`w-full px-4 py-3.5 bg-white border rounded-xl text-sm outline-none transition-all ${errors.studentId
-                                    ? 'border-red-400 ring-2 ring-red-100'
-                                    : 'border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                                ? 'border-red-400 ring-2 ring-red-100'
+                                : 'border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-100'
                                 }`}
                         />
                         {errors.studentId && (
@@ -138,8 +130,8 @@ export function Login({ onLogin, onGoToRegister }: LoginProps) {
                                 }}
                                 placeholder="Mínimo 8 caracteres"
                                 className={`w-full px-4 py-3.5 pr-12 bg-white border rounded-xl text-sm outline-none transition-all ${errors.password
-                                        ? 'border-red-400 ring-2 ring-red-100'
-                                        : 'border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                                    ? 'border-red-400 ring-2 ring-red-100'
+                                    : 'border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-100'
                                     }`}
                             />
                             <button

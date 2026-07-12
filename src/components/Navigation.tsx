@@ -27,15 +27,15 @@ export function Navigation({ user, onLogout, fotoPerfil }: NavigationProps) {
         <>
             {/* Top bar móvil */}
             <header className="lg:hidden sticky top-0 z-40 bg-white/80 dark:bg-[#0f0f0f]/80 backdrop-blur-xl border-b border-gray-100 dark:border-white/5">
-                <div className="flex items-center justify-between h-14 px-4">
-                    <div className="flex items-center gap-2">
-                        <div className="flex rounded-md overflow-hidden">
-                            <div className="w-6 h-7 bg-red-600 flex items-center justify-center"><span className="text-white font-bold text-xs">U</span></div>
-                            <div className="w-6 h-7 bg-black flex items-center justify-center"><span className="text-white font-bold text-xs">T</span></div>
-                            <div className="w-6 h-7 bg-red-600 flex items-center justify-center"><span className="text-white font-bold text-xs">P</span></div>
-                        </div>
-                        <span className="font-bold text-gray-800 dark:text-white">Play</span>
-                    </div>
+                <div className="flex items-center justify-between h-20 px-4">
+                    <Link to="/">
+                        <img
+                            src="/utp-play.png"
+                            alt="UTP Play"
+                            className="h-30 w-auto object-contain active:scale-95 transition-transform"
+                            style={{ filter: isDark ? 'drop-shadow(0 0 8px rgba(255,255,255,0.6)) brightness(1.3)' : 'none' }}
+                        />
+                    </Link>
 
                     <div className="flex items-center gap-1">
                         <button onClick={toggle} className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white active:scale-95 transition-all" aria-label="Cambiar tema">
@@ -83,13 +83,15 @@ export function Navigation({ user, onLogout, fotoPerfil }: NavigationProps) {
 
             {/* Sidebar desktop */}
             <aside className="hidden lg:flex lg:flex-col lg:fixed lg:left-0 lg:top-0 lg:h-screen lg:w-64 bg-white/80 dark:bg-[#0f0f0f]/80 backdrop-blur-xl border-r border-gray-100 dark:border-white/5 z-40">
-                <div className="flex items-center gap-2 px-6 h-20 border-b border-gray-100 dark:border-white/5">
-                    <div className="flex rounded-md overflow-hidden">
-                        <div className="w-7 h-9 bg-red-600 flex items-center justify-center"><span className="text-white font-bold text-sm">U</span></div>
-                        <div className="w-7 h-9 bg-black flex items-center justify-center"><span className="text-white font-bold text-sm">T</span></div>
-                        <div className="w-7 h-9 bg-red-600 flex items-center justify-center"><span className="text-white font-bold text-sm">P</span></div>
-                    </div>
-                    <span className="font-bold text-xl text-gray-800 dark:text-white">Play</span>
+                <div className="flex items-center justify-center px-6 h-20 border-b border-gray-100 dark:border-white/5">
+                    <Link to="/">
+                        <img
+                            src="/utp-play.png"
+                            alt="UTP Play"
+                            className="h-40 w-auto object-contain active:scale-95 transition-transform"
+                            style={{ filter: isDark ? 'drop-shadow(0 0 8px rgba(255,255,255,0.6)) brightness(1.3)' : 'none' }}
+                        />
+                    </Link>
                 </div>
 
                 <div className="flex-1 px-3 py-6 space-y-1">
