@@ -201,6 +201,19 @@ export const chatService = {
         })
         return res.text()
     },
+
+    async getNoLeidos(studentId: string, conexionIds: number[]) {
+        if (conexionIds.length === 0) return {}
+        const res = await fetch(`${API_URL}/chat/no-leidos/${studentId}?conexionIds=${conexionIds.join(',')}`)
+        return res.json()
+    },
+
+    async marcarLeido(conexionId: number, studentId: string) {
+        const res = await fetch(`${API_URL}/chat/conexion/${conexionId}/usuario/${studentId}/marcar-leido`, {
+            method: 'POST',
+        })
+        return res.text()
+    },
 }
 
 export const implementoService = {

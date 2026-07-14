@@ -45,9 +45,6 @@ export function Chat({ user }: ChatProps) {
     const location = useLocation()
     const { setUnreadForChat, clearUnreadForChat } = useUnread()
 
-    // Referencia para saber el último mensaje visto por chat
-    const lastSeenRef = useRef<Record<number, number>>({})
-
     // Abrir chat automáticamente si viene desde Matchmaking
     useEffect(() => {
         const conexionId = location.state?.abrirConexionId
@@ -77,23 +74,28 @@ export function Chat({ user }: ChatProps) {
         cargarConexiones()
     }, [cargarConexiones])
 
-    // Polling de mensajes cada 4 segundos cuando hay chat activo
     const cargarMensajes = useCallback(async (conexionId: number) => {
         try {
             const msgs = await chatService.getMensajes(conexionId, user.studentId)
-            const lista = Array.isArray(msgs) ? msgs : []
-            setMensajes(lista)
-
-            // Contar mensajes no leídos (del otro, más nuevos que el último visto)
-            const lastSeen = lastSeenRef.current[conexionId] || 0
-            const noLeidos = lista.filter(
-                (m: any) =>
-                    m.remitente?.studentId?.toUpperCase() !== user.studentId?.toUpperCase() &&
-                    m.id > lastSeen
-            ).length
-            setUnreadForChat(conexionId, noLeidos)
+            setMensajes(Array.isArray(msgs) ? msgs : [])
         } catch { }
-    }, [user.studentId, setUnreadForChat])
+    }, [user.studentId])
+
+    useEffect(() => {
+        if (conexiones.length === 0) return
+        const revisar = async () => {
+            const ids = conexiones.map(c => c.id)
+            try {
+                const conteos = await chatService.getNoLeidos(user.studentId, ids)
+                Object.entries(conteos).forEach(([conexionId, count]) => {
+                    setUnreadForChat(Number(conexionId), count as number)
+                })
+            } catch { }
+        }
+        revisar()
+        const t = setInterval(revisar, 15000)
+        return () => clearInterval(t)
+    }, [conexiones, user.studentId, setUnreadForChat])
 
     useEffect(() => {
         if (!activeChat) return
@@ -121,21 +123,15 @@ export function Chat({ user }: ChatProps) {
         setImagenPreview(null)
         setImagenFile(null)
         setShowChatMobile(true)
-
-        // Marcar como leído: guardamos el ID del último mensaje actual
-        const ultimoMensaje = mensajes[mensajes.length - 1]
-        if (ultimoMensaje) {
-            lastSeenRef.current[conexion.id] = ultimoMensaje.id
-        }
+        chatService.marcarLeido(conexion.id, user.studentId).catch(() => { })
         clearUnreadForChat(conexion.id)
     }
 
     useEffect(() => {
         if (!activeChat || mensajes.length === 0) return
-        const ultimo = mensajes[mensajes.length - 1]
-        lastSeenRef.current[activeChat.id] = ultimo.id
+        chatService.marcarLeido(activeChat.id, user.studentId).catch(() => { })
         clearUnreadForChat(activeChat.id)
-    }, [mensajes, activeChat, clearUnreadForChat])
+    }, [mensajes, activeChat, user.studentId, clearUnreadForChat])
 
     const cerrarChat = () => {
         setShowChatMobile(false)
