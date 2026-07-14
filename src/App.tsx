@@ -12,6 +12,7 @@ import { Register } from './components/Register'
 import { SplashScreen } from './components/SplashScreen'
 import { AnimatedBackground } from './components/AnimatedBackground'
 import { PageTransition } from './components/PageTransition'
+import { NotificationProvider } from './components/NotificationContext'
 
 type AuthScreen = 'login' | 'register'
 
@@ -67,15 +68,17 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <AnimatedBackground />
-      <div className="min-h-screen bg-transparent transition-colors">
-        <Navigation user={user} onLogout={handleLogout} fotoPerfil={fotoPerfil} />
-        <main className="lg:ml-64 pb-24 lg:pb-8 pt-4 lg:pt-8 px-4 lg:px-8">
-          <div className="max-w-5xl mx-auto">
-            <AnimatedRoutes user={user} onFotoChange={setFotoPerfil} />
-          </div>
-        </main>
-      </div>
+      <NotificationProvider studentId={user.studentId}>
+        <AnimatedBackground />
+        <div className="min-h-screen bg-transparent transition-colors">
+          <Navigation user={user} onLogout={handleLogout} fotoPerfil={fotoPerfil} />
+          <main className="lg:ml-64 pb-24 lg:pb-8 pt-4 lg:pt-8 px-4 lg:px-8">
+            <div className="max-w-5xl mx-auto">
+              <AnimatedRoutes user={user} onFotoChange={setFotoPerfil} />
+            </div>
+          </main>
+        </div>
+      </NotificationProvider>
     </BrowserRouter>
   )
 }

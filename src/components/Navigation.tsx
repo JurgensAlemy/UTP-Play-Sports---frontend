@@ -3,6 +3,7 @@ import { Home, Calendar, Users, User, LogOut, Moon, Sun, MessageCircle } from 'l
 import { useTheme } from './ThemeProvider'
 
 import { useUnread } from './UnreadContext'
+import { NotificationBell } from './NotificationBell'
 
 interface NavigationProps {
     user: any
@@ -41,6 +42,7 @@ export function Navigation({ user, onLogout, fotoPerfil }: NavigationProps) {
                         <button onClick={toggle} className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-700 dark:hover:text-white active:scale-95 transition-all" aria-label="Cambiar tema">
                             {isDark ? <Sun size={18} /> : <Moon size={18} />}
                         </button>
+                        <NotificationBell />
                         <Link to="/profile" className="flex items-center gap-2 ml-1">
                             <div className="w-9 h-9 bg-gradient-to-br from-red-600 to-red-700 rounded-full overflow-hidden flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                                 {fotoPerfil
@@ -130,6 +132,7 @@ export function Navigation({ user, onLogout, fotoPerfil }: NavigationProps) {
                             <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user?.studentId}</p>
                         </div>
                     </div>
+                    <NotificationBell variant="sidebar" />
                     <button onClick={toggle} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-800 dark:hover:text-white transition-colors">
                         {isDark ? <Sun size={18} /> : <Moon size={18} />}
                         {isDark ? 'Modo claro' : 'Modo oscuro'}
