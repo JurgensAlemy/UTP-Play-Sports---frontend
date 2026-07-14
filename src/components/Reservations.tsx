@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { Calendar as CalendarIcon, Clock, MapPin, Users, ChevronLeft, ChevronRight, X, AlertTriangle, Search, Zap, Plus, Trash2 } from 'lucide-react'
 import { format, addDays, startOfWeek, addWeeks, isSameDay, isBefore, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { reservaService } from '../services/api'
 import { useToast } from './Toast'
+
+import { reservaService, implementoService } from '../services/api'
 
 interface ReservationsProps {
     user: any
@@ -94,6 +95,11 @@ export function Reservations({ user }: ReservationsProps) {
     const [quickResults, setQuickResults] = useState<any[] | null>(null)
     const [quickLoading, setQuickLoading] = useState(false)
 
+    const [implementosDisponibles, setImplementosDisponibles] = useState<any[]>([])
+    const [loadingImplementos, setLoadingImplementos] = useState(false)
+    const [quierePelota, setQuierePelota] = useState(false)
+    const [cantChalecos, setCantChalecos] = useState(0)
+
     const sports = ['Todos', 'Fútbol', 'Básquetbol', 'Vóley', 'Tenis']
     const courts = [
         { id: 1, name: 'Cancha 1', sport: 'Fútbol', capacity: 10 },
@@ -149,6 +155,21 @@ export function Reservations({ user }: ReservationsProps) {
         }
         fetchSemana()
     }, [currentWeekStart])
+
+    useEffect(() => {
+        if (!showBookingModal || !selectedSlot) return
+        setQuierePelota(false)
+        setCantChalecos(0)
+        setLoadingImplementos(true)
+        implementoService.getDisponibilidad(
+            selectedSlot.court.sport,
+            format(selectedSlot.date, 'yyyy-MM-dd'),
+            labelBloque(selectedSlot.bloque)
+        )
+            .then(data => setImplementosDisponibles(Array.isArray(data) ? data : []))
+            .catch(() => setImplementosDisponibles([]))
+            .finally(() => setLoadingImplementos(false))
+    }, [showBookingModal, selectedSlot])
 
     const refrescarReservas = async () => {
         const todas: any[] = []
@@ -220,15 +241,25 @@ export function Reservations({ user }: ReservationsProps) {
 
     const confirmBooking = async () => {
         if (!selectedSlot) return
+        const implementosSeleccion: { tipo: string; cantidad: number }[] = []
+        if (quierePelota) implementosSeleccion.push({ tipo: 'PELOTA', cantidad: 1 })
+        if (cantChalecos > 0) implementosSeleccion.push({ tipo: 'CHALECO', cantidad: cantChalecos })
+
         try {
-            await reservaService.crearReserva({
+            const resultado: any = await reservaService.crearReserva({
                 studentId: user.studentId,
                 cancha: selectedSlot.court.name,
                 deporte: selectedSlot.court.sport,
                 fecha: format(selectedSlot.date, 'yyyy-MM-dd'),
                 horario: labelBloque(selectedSlot.bloque),
                 capacidad: selectedSlot.court.capacity,
+                implementos: implementosSeleccion,
             })
+
+            if (typeof resultado === 'string') {
+                showToast(resultado, 'error') // ej. "Solo quedan 2 pelotas disponibles..."
+                return
+            }
 
             if (extender) {
                 const siguiente = bloqueSiguiente(selectedSlot.bloque)
@@ -472,6 +503,15 @@ export function Reservations({ user }: ReservationsProps) {
                                 </div>
                                 <p className="font-black text-gray-900 dark:text-white text-base">{r.cancha}</p>
                                 <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-4">{r.deporte} · {format(new Date(r.fecha + 'T00:00:00'), 'dd MMM', { locale: es })} · {r.horario}</p>
+                                {r.prestamos && r.prestamos.length > 0 && (
+                                    <div className="flex gap-1.5 mb-3">
+                                        {r.prestamos.map((p: any) => (
+                                            <span key={p.id} className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-full">
+                                                {p.implemento?.tipo === 'PELOTA' ? '⚽ Pelota' : `🦺 x${p.cantidad}`}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                                 <button
                                     onClick={() => pedirConfirmacionCard(r)}
                                     className="w-full py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl active:scale-[0.98] transition-transform"
@@ -653,6 +693,55 @@ export function Reservations({ user }: ReservationsProps) {
                                     <p className="text-xs text-gray-500 dark:text-gray-400">El siguiente bloque está libre, ¿quieres reservarlo también?</p>
                                 </div>
                             </button>
+                        )}
+
+                        {!loadingImplementos && implementosDisponibles.length > 0 && (
+                            <div className="mb-6 space-y-3">
+                                <p className="text-xs font-bold text-gray-700 dark:text-gray-300">¿Necesitas implementos?</p>
+
+                                {implementosDisponibles.map((imp: any) =>
+                                    imp.tipo === 'PELOTA' ? (
+                                        <button
+                                            key={imp.id}
+                                            onClick={() => imp.disponible > 0 && setQuierePelota(!quierePelota)}
+                                            disabled={imp.disponible === 0}
+                                            className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${quierePelota ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-dashed border-gray-200 dark:border-gray-700 hover:border-red-300'
+                                                }`}
+                                        >
+                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-lg ${quierePelota ? 'bg-red-600' : 'bg-gray-100 dark:bg-gray-800'}`}>⚽</div>
+                                            <div className="text-left flex-1">
+                                                <p className="text-sm font-bold text-gray-900 dark:text-white">Llevar pelota prestada</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {imp.disponible > 0 ? `${imp.disponible} disponibles en este horario` : 'Sin stock para este horario'}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    ) : (
+                                        <div key={imp.id} className="flex items-center justify-between p-4 rounded-2xl border border-gray-200 dark:border-gray-700">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-lg">🦺</div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-gray-900 dark:text-white">Chalecos</p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">{imp.disponible} disponibles</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => setCantChalecos(Math.max(0, cantChalecos - 1))}
+                                                    disabled={cantChalecos === 0}
+                                                    className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-bold disabled:opacity-30"
+                                                >-</button>
+                                                <span className="w-6 text-center font-bold text-gray-900 dark:text-white">{cantChalecos}</span>
+                                                <button
+                                                    onClick={() => setCantChalecos(Math.min(imp.disponible, cantChalecos + 1))}
+                                                    disabled={cantChalecos >= imp.disponible}
+                                                    className="w-8 h-8 rounded-lg bg-red-600 text-white font-bold disabled:opacity-30"
+                                                >+</button>
+                                            </div>
+                                        </div>
+                                    )
+                                )}
+                            </div>
                         )}
 
                         <div className="flex gap-3">

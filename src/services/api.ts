@@ -44,6 +44,7 @@ export const reservaService = {
         fecha: string
         horario: string
         capacidad: number
+        implementos?: { tipo: string; cantidad: number }[]
     }) {
         const res = await fetch(`${API_URL}/reservas`, {
             method: 'POST',
@@ -199,5 +200,18 @@ export const chatService = {
             method: 'DELETE',
         })
         return res.text()
+    },
+}
+
+export const implementoService = {
+    async getDisponibilidad(deporte: string, fecha: string, horario: string) {
+        const res = await fetch(
+            `${API_URL}/implementos/disponibilidad?deporte=${encodeURIComponent(deporte)}&fecha=${fecha}&horario=${encodeURIComponent(horario)}`
+        )
+        return res.json()
+    },
+    async getPrestamosActivos(studentId: string) {
+        const res = await fetch(`${API_URL}/implementos/prestamos/usuario/${studentId}`)
+        return res.json()
     },
 }

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { reservaService, matchmakingService } from '../services/api'
 import { LiveMatch } from './LiveMatch'
 
+import { WeatherWidget } from './WeatherWidget'
+
 interface DashboardProps {
     user: any
 }
@@ -189,6 +191,9 @@ export function Dashboard({ user }: DashboardProps) {
                 </div>
 
                 <div>
+                    <div className="mb-5">
+                        <WeatherWidget proximaReserva={proximaReserva} />
+                    </div>
                     <h2 className="font-bold text-gray-900 dark:text-white text-base lg:text-lg mb-3 lg:mb-4">Accesos rápidos</h2>
                     <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
                         <Link

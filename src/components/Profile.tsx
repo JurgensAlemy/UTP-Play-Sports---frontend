@@ -27,6 +27,10 @@ export function Profile({ user, onFotoChange }: ProfileProps) {
     const [reservaAEliminar, setReservaAEliminar] = useState<number | null>(null)
     const [eliminando, setEliminando] = useState(false)
 
+    const [showPreviewModal, setShowPreviewModal] = useState(false)
+    const [previewPosts, setPreviewPosts] = useState<any[]>([])
+    const [loadingPreviewPosts, setLoadingPreviewPosts] = useState(false)
+
     useEffect(() => {
         Promise.all([
             usuarioService.getPerfil(user.studentId),
@@ -66,6 +70,19 @@ export function Profile({ user, onFotoChange }: ProfileProps) {
         } finally {
             setSubiendoFoto(false)
             if (fotoInputRef.current) fotoInputRef.current.value = ''
+        }
+    }
+
+    const abrirPreview = async () => {
+        setShowPreviewModal(true)
+        setLoadingPreviewPosts(true)
+        try {
+            const posts = await matchmakingService.getSolicitudesByUsuario(user.studentId)
+            setPreviewPosts(Array.isArray(posts) ? posts.filter((p: any) => p.estado === 'ACTIVA') : [])
+        } catch {
+            setPreviewPosts([])
+        } finally {
+            setLoadingPreviewPosts(false)
         }
     }
 
@@ -176,6 +193,12 @@ export function Profile({ user, onFotoChange }: ProfileProps) {
                         <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-bold shadow-sm">
                             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" /> Estudiante Verificado
                         </div>
+                        <button
+                            onClick={abrirPreview}
+                            className="mt-3 flex items-center gap-1.5 text-xs font-bold text-white/90 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors"
+                        >
+                            👀 Ver cómo te ven otros jugadores
+                        </button>
                     </div>
 
                     {!isEditing ? (
@@ -364,6 +387,71 @@ export function Profile({ user, onFotoChange }: ProfileProps) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showPreviewModal && createPortal(
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end lg:items-center justify-center z-50 p-4" onClick={() => setShowPreviewModal(false)}>
+                    <div className="bg-white dark:bg-[#1a1a1a] rounded-3xl max-w-md w-full p-6 lg:p-8 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom shadow-2xl border border-gray-100 dark:border-gray-800" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white">Así te ven</h3>
+                            <button onClick={() => setShowPreviewModal(false)} className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
+                                <X size={20} className="text-gray-500" />
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-400 mb-6">Vista previa de tu perfil en Matchmaking, tal como la ven otros jugadores</p>
+
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-16 h-16 bg-gradient-to-br from-red-600 to-red-800 rounded-2xl overflow-hidden flex items-center justify-center text-white font-black text-2xl flex-shrink-0">
+                                {fotoPerfil
+                                    ? <img src={`${BASE_URL}${fotoPerfil}`} alt="" className="w-full h-full object-cover" />
+                                    : formData.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2)
+                                }
+                            </div>
+                            <div>
+                                <h4 className="font-black text-gray-900 dark:text-white text-lg">{formData.name}</h4>
+                                <p className="text-xs font-medium text-gray-500">{formData.faculty || 'Sin facultad'} · {user.studentId}</p>
+                                <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-green-600 dark:text-green-400">
+                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full" /> Verificado
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-3 border border-gray-100 dark:border-gray-800">
+                                <p className="text-[10px] font-bold text-gray-400 mb-1">Deporte favorito</p>
+                                <p className="text-sm font-bold text-gray-900 dark:text-white">{formData.favoriteSport}</p>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-3 border border-gray-100 dark:border-gray-800">
+                                <p className="text-[10px] font-bold text-gray-400 mb-1">Nivel</p>
+                                <p className="text-sm font-bold text-gray-900 dark:text-white">{formData.skillLevel}</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-3">Tus publicaciones activas (así las ven en Explorar)</p>
+                            {loadingPreviewPosts ? (
+                                <div className="flex items-center justify-center py-6">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600"></div>
+                                </div>
+                            ) : previewPosts.length === 0 ? (
+                                <p className="text-sm text-gray-400 text-center py-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
+                                    No tienes publicaciones activas — otros jugadores solo verán tu perfil si te buscan directamente
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {previewPosts.map((p: any) => (
+                                        <div key={p.id} className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-3 border border-gray-100 dark:border-gray-800">
+                                            <p className="text-sm font-bold text-gray-900 dark:text-white">{p.deporte} · {p.nivel}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">{p.disponibilidad}</p>
+                                            <p className="text-xs text-gray-400 mt-1 line-clamp-2">{p.descripcion}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     )
