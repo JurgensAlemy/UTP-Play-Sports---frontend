@@ -215,3 +215,14 @@ export const implementoService = {
         return res.json()
     },
 }
+
+export const notificacionService = {
+    async getNuevas(studentId: string) {
+        const res = await fetch(`${API_URL}/notificaciones/nuevas/${studentId}`)
+        return res.json()
+    },
+    async marcarVistas(studentId: string) {
+        const res = await fetch(`${API_URL}/notificaciones/marcar-vistas/${studentId}`, { method: 'POST' })
+        return res.text()
+    },
+}

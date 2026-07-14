@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
-import { matchmakingService } from '../services/api'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { notificacionService } from '../services/api'
 
 interface NotificationContextType {
     nuevasPublicaciones: any[]
@@ -18,35 +18,12 @@ export function useNotifications() {
 }
 
 export function NotificationProvider({ studentId, children }: { studentId: string; children: React.ReactNode }) {
-    const [solicitudes, setSolicitudes] = useState<any[]>([])
-    const [vistos, setVistos] = useState<Set<number>>(() => {
-        try {
-            const raw = localStorage.getItem(`match_vistos_${studentId}`)
-            return raw ? new Set(JSON.parse(raw)) : new Set()
-        } catch { return new Set() }
-    })
-    const primeraCarga = useRef(true)
+    const [nuevasPublicaciones, setNuevasPublicaciones] = useState<any[]>([])
 
     const cargar = useCallback(async () => {
         try {
-            const data = await matchmakingService.getSolicitudesActivas()
-            const lista = Array.isArray(data)
-                ? data.filter((s: any) => s.usuario?.studentId?.toUpperCase() !== studentId.toUpperCase())
-                : []
-            setSolicitudes(lista)
-
-            // En la primerísima carga (usuario nunca antes registrado en este navegador),
-            // marcamos como "ya vistas" todas las que ya existían — para no bombardearlo
-            // con publicaciones viejas apenas entra por primera vez.
-            if (primeraCarga.current) {
-                primeraCarga.current = false
-                setVistos(prev => {
-                    if (prev.size > 0) return prev
-                    const iniciales = new Set<number>(lista.map((s: any) => s.id))
-                    localStorage.setItem(`match_vistos_${studentId}`, JSON.stringify([...iniciales]))
-                    return iniciales
-                })
-            }
+            const data = await notificacionService.getNuevas(studentId)
+            setNuevasPublicaciones(Array.isArray(data) ? data : [])
         } catch { }
     }, [studentId])
 
@@ -56,16 +33,12 @@ export function NotificationProvider({ studentId, children }: { studentId: strin
         return () => clearInterval(t)
     }, [cargar])
 
-    const nuevasPublicaciones = solicitudes.filter(s => !vistos.has(s.id))
-
-    const marcarVistas = useCallback(() => {
-        setVistos(prev => {
-            const actualizado = new Set(prev)
-            solicitudes.forEach(s => actualizado.add(s.id))
-            localStorage.setItem(`match_vistos_${studentId}`, JSON.stringify([...actualizado]))
-            return actualizado
-        })
-    }, [solicitudes, studentId])
+    const marcarVistas = useCallback(async () => {
+        setNuevasPublicaciones([]) // optimista, se siente instantáneo en la UI
+        try {
+            await notificacionService.marcarVistas(studentId)
+        } catch { }
+    }, [studentId])
 
     return (
         <NotificationContext.Provider value={{ nuevasPublicaciones, unseenCount: nuevasPublicaciones.length, marcarVistas }}>
