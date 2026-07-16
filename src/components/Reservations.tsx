@@ -3,8 +3,10 @@ import { Calendar as CalendarIcon, Clock, MapPin, Users, ChevronLeft, ChevronRig
 import { format, addDays, startOfWeek, addWeeks, isSameDay, isBefore, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useToast } from './Toast'
+import { ImplementosPicker, iconoImplemento, nombreImplemento } from './ImplementosPicker'
 
-import { reservaService, implementoService } from '../services/api'
+import { reservaService } from '../services/api'
+
 
 interface ReservationsProps {
     user: any
@@ -27,6 +29,16 @@ const BLOQUES = [
 ]
 
 const labelBloque = (b: { inicio: string; fin: string }) => `${b.inicio} - ${b.fin}`
+
+const sportEmoji = (s: string) => {
+    switch (s) {
+        case 'Fútbol': return '⚽'
+        case 'Básquetbol': return '🏀'
+        case 'Vóley': return '🏐'
+        case 'Tenis': return '🎾'
+        default: return '🏆'
+    }
+}
 
 const combinarFechaHora = (fecha: string, hora: string) => {
     const [h, m] = hora.split(':').map(Number)
@@ -95,10 +107,14 @@ export function Reservations({ user }: ReservationsProps) {
     const [quickResults, setQuickResults] = useState<any[] | null>(null)
     const [quickLoading, setQuickLoading] = useState(false)
 
-    const [implementosDisponibles, setImplementosDisponibles] = useState<any[]>([])
-    const [loadingImplementos, setLoadingImplementos] = useState(false)
-    const [quierePelota, setQuierePelota] = useState(false)
-    const [cantChalecos, setCantChalecos] = useState(0)
+    const [implementosSeleccion, setImplementosSeleccion] = useState<{ tipo: string; cantidad: number }[]>([])
+    const [showDetalleModal, setShowDetalleModal] = useState(false)
+    const [reservaDetalle, setReservaDetalle] = useState<any>(null)
+
+    const abrirDetalle = (r: any) => {
+        setReservaDetalle(r)
+        setShowDetalleModal(true)
+    }
 
     const sports = ['Todos', 'Fútbol', 'Básquetbol', 'Vóley', 'Tenis']
     const courts = [
@@ -155,21 +171,6 @@ export function Reservations({ user }: ReservationsProps) {
         }
         fetchSemana()
     }, [currentWeekStart])
-
-    useEffect(() => {
-        if (!showBookingModal || !selectedSlot) return
-        setQuierePelota(false)
-        setCantChalecos(0)
-        setLoadingImplementos(true)
-        implementoService.getDisponibilidad(
-            selectedSlot.court.sport,
-            format(selectedSlot.date, 'yyyy-MM-dd'),
-            labelBloque(selectedSlot.bloque)
-        )
-            .then(data => setImplementosDisponibles(Array.isArray(data) ? data : []))
-            .catch(() => setImplementosDisponibles([]))
-            .finally(() => setLoadingImplementos(false))
-    }, [showBookingModal, selectedSlot])
 
     const refrescarReservas = async () => {
         const todas: any[] = []
@@ -241,10 +242,6 @@ export function Reservations({ user }: ReservationsProps) {
 
     const confirmBooking = async () => {
         if (!selectedSlot) return
-        const implementosSeleccion: { tipo: string; cantidad: number }[] = []
-        if (quierePelota) implementosSeleccion.push({ tipo: 'PELOTA', cantidad: 1 })
-        if (cantChalecos > 0) implementosSeleccion.push({ tipo: 'CHALECO', cantidad: cantChalecos })
-
         try {
             const resultado: any = await reservaService.crearReserva({
                 studentId: user.studentId,
@@ -257,7 +254,7 @@ export function Reservations({ user }: ReservationsProps) {
             })
 
             if (typeof resultado === 'string') {
-                showToast(resultado, 'error') // ej. "Solo quedan 2 pelotas disponibles..."
+                showToast(resultado, 'error')
                 return
             }
 
@@ -283,6 +280,7 @@ export function Reservations({ user }: ReservationsProps) {
         setShowBookingModal(false)
         setSelectedSlot(null)
         setExtender(false)
+        setImplementosSeleccion([])
     }
 
     const pedirConfirmacionBloque = (courtName: string, date: Date, bloque: { inicio: string; fin: string }) => {
@@ -486,35 +484,38 @@ export function Reservations({ user }: ReservationsProps) {
                     <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 scrollbar-hide">
                         {reservasActivas.map(r => (
                             <div key={r.id} className="flex-shrink-0 w-64 lg:w-72 bg-white/70 dark:bg-[#1a1a1a]/70 backdrop-blur-xl border border-white/50 dark:border-white/5 rounded-3xl p-5 shadow-sm">
-                                <div className="flex items-start justify-between mb-3">
-                                    <div className="w-10 h-10 bg-red-50 dark:bg-red-900/20 rounded-xl flex items-center justify-center">
-                                        <MapPin className="text-red-600" size={18} />
-                                    </div>
-                                    {estaEnCursoReserva(r.fecha, r.horario) ? (
-                                        <span className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-full text-[10px] font-bold uppercase">
-                                            <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                                            En curso
-                                        </span>
-                                    ) : (
-                                        <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-[10px] font-bold">
-                                            {r.estado}
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="font-black text-gray-900 dark:text-white text-base">{r.cancha}</p>
-                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-4">{r.deporte} · {format(new Date(r.fecha + 'T00:00:00'), 'dd MMM', { locale: es })} · {r.horario}</p>
-                                {r.prestamos && r.prestamos.length > 0 && (
-                                    <div className="flex gap-1.5 mb-3">
-                                        {r.prestamos.map((p: any) => (
-                                            <span key={p.id} className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-full">
-                                                {p.implemento?.tipo === 'PELOTA' ? '⚽ Pelota' : `🦺 x${p.cantidad}`}
+                                <button onClick={() => abrirDetalle(r)} className="w-full text-left active:opacity-70 transition-opacity">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="w-10 h-10 bg-red-50 dark:bg-red-900/20 rounded-xl flex items-center justify-center">
+                                            <MapPin className="text-red-600" size={18} />
+                                        </div>
+                                        {estaEnCursoReserva(r.fecha, r.horario) ? (
+                                            <span className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-full text-[10px] font-bold uppercase">
+                                                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                                                En curso
                                             </span>
-                                        ))}
+                                        ) : (
+                                            <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-[10px] font-bold">
+                                                {r.estado}
+                                            </span>
+                                        )}
                                     </div>
-                                )}
+                                    <p className="font-black text-gray-900 dark:text-white text-base">{r.cancha}</p>
+                                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-4">{r.deporte} · {format(new Date(r.fecha + 'T00:00:00'), 'dd MMM', { locale: es })} · {r.horario}</p>
+                                    {r.prestamos && r.prestamos.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mb-3">
+                                            {r.prestamos.map((p: any) => (
+                                                <span key={p.id} className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-full">
+                                                    {iconoImplemento(p.implemento?.tipo, p.implemento?.deporte)} {nombreImplemento(p.implemento?.tipo, p.implemento?.deporte)}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <p className="text-[10px] font-bold text-red-500 dark:text-red-400">Ver detalles →</p>
+                                </button>
                                 <button
                                     onClick={() => pedirConfirmacionCard(r)}
-                                    className="w-full py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl active:scale-[0.98] transition-transform"
+                                    className="w-full mt-3 py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl active:scale-[0.98] transition-transform"
                                 >
                                     Cancelar reserva
                                 </button>
@@ -653,104 +654,78 @@ export function Reservations({ user }: ReservationsProps) {
 
             {/* Modal Confirmación de RESERVA — con opción de extender */}
             {showBookingModal && selectedSlot && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end lg:items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-[#1a1a1a] rounded-3xl max-w-md w-full p-6 animate-in slide-in-from-bottom shadow-2xl border border-gray-100 dark:border-gray-800">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-black text-gray-900 dark:text-white">Confirmar reserva</h3>
-                            <button onClick={() => { setShowBookingModal(false); setSelectedSlot(null); setExtender(false) }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-                                <X size={20} className="text-gray-400" />
-                            </button>
-                        </div>
-                        <div className="space-y-3 mb-6">
-                            <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                <div className="w-10 h-10 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center"><MapPin className="text-red-600" size={18} /></div>
-                                <div><p className="text-xs font-medium text-gray-500 dark:text-gray-400">Cancha</p><p className="font-bold text-gray-900 dark:text-white">{selectedSlot.court.name} — {selectedSlot.court.sport}</p></div>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end lg:items-center justify-center z-50 p-0 lg:p-4">
+                    <div className="bg-white dark:bg-[#1a1a1a] rounded-t-3xl lg:rounded-3xl w-full max-w-lg lg:max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl border border-gray-100 dark:border-gray-800 animate-in slide-in-from-bottom duration-300">
+                        <div className="p-5 sm:p-6">
+                            <div className="flex items-center justify-between mb-5">
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white">Confirmar reserva</h3>
+                                <button onClick={() => { setShowBookingModal(false); setSelectedSlot(null); setExtender(false) }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                                    <X size={20} className="text-gray-400" />
+                                </button>
                             </div>
-                            <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                <div className="w-10 h-10 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center"><CalendarIcon className="text-red-600" size={18} /></div>
-                                <div><p className="text-xs font-medium text-gray-500 dark:text-gray-400">Fecha</p><p className="font-bold text-gray-900 dark:text-white">{format(selectedSlot.date, 'dd MMMM yyyy', { locale: es })}</p></div>
-                            </div>
-                            <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                <div className="w-10 h-10 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center"><Clock className="text-red-600" size={18} /></div>
-                                <div><p className="text-xs font-medium text-gray-500 dark:text-gray-400">Horario</p><p className="font-bold text-gray-900 dark:text-white">{labelBloque(selectedSlot.bloque)}{extender && bloqueSiguiente(selectedSlot.bloque) ? ` + ${labelBloque(bloqueSiguiente(selectedSlot.bloque)!)}` : ''}</p></div>
-                            </div>
-                        </div>
 
-                        {/* Opción de extender — solo aparece si el bloque siguiente está libre */}
-                        {puedeExtender() && (
-                            <button
-                                onClick={() => setExtender(!extender)}
-                                className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 mb-6 transition-all ${extender
-                                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
-                                    : 'border-dashed border-gray-200 dark:border-gray-700 hover:border-red-300'
-                                    }`}
-                            >
-                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${extender ? 'bg-red-600' : 'bg-gray-100 dark:bg-gray-800'}`}>
-                                    <Plus className={extender ? 'text-white' : 'text-gray-400'} size={18} />
-                                </div>
-                                <div className="text-left flex-1">
-                                    <p className="text-sm font-bold text-gray-900 dark:text-white">Extender a {labelBloque(bloqueSiguiente(selectedSlot.bloque)!)}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">El siguiente bloque está libre, ¿quieres reservarlo también?</p>
-                                </div>
-                            </button>
-                        )}
-
-                        {!loadingImplementos && implementosDisponibles.length > 0 && (
-                            <div className="mb-6 space-y-3">
-                                <p className="text-xs font-bold text-gray-700 dark:text-gray-300">¿Necesitas implementos?</p>
-
-                                {implementosDisponibles.map((imp: any) =>
-                                    imp.tipo === 'PELOTA' ? (
-                                        <button
-                                            key={imp.id}
-                                            onClick={() => imp.disponible > 0 && setQuierePelota(!quierePelota)}
-                                            disabled={imp.disponible === 0}
-                                            className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${quierePelota ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-dashed border-gray-200 dark:border-gray-700 hover:border-red-300'
-                                                }`}
-                                        >
-                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-lg ${quierePelota ? 'bg-red-600' : 'bg-gray-100 dark:bg-gray-800'}`}>⚽</div>
-                                            <div className="text-left flex-1">
-                                                <p className="text-sm font-bold text-gray-900 dark:text-white">Llevar pelota prestada</p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {imp.disponible > 0 ? `${imp.disponible} disponibles en este horario` : 'Sin stock para este horario'}
-                                                </p>
-                                            </div>
-                                        </button>
-                                    ) : (
-                                        <div key={imp.id} className="flex items-center justify-between p-4 rounded-2xl border border-gray-200 dark:border-gray-700">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-lg">🦺</div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-gray-900 dark:text-white">Chalecos</p>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400">{imp.disponible} disponibles</p>
+                            <div className="lg:grid lg:grid-cols-5 lg:gap-6">
+                                {/* Columna izquierda: ticket + extender */}
+                                <div className="lg:col-span-2 space-y-3 mb-5 lg:mb-0">
+                                    <div className="bg-gradient-to-br from-red-600 to-black rounded-2xl p-4 sm:p-5 text-white relative overflow-hidden">
+                                        <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
+                                        <div className="relative z-10">
+                                            <p className="text-[11px] font-bold uppercase tracking-wide opacity-75">{selectedSlot.court.sport}</p>
+                                            <p className="text-xl sm:text-2xl font-black leading-tight">{selectedSlot.court.name}</p>
+                                            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/15 text-xs sm:text-sm font-bold">
+                                                <div className="flex items-center gap-1.5">
+                                                    <CalendarIcon size={13} />
+                                                    {format(selectedSlot.date, 'dd MMM', { locale: es })}
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <Clock size={13} />
+                                                    {labelBloque(selectedSlot.bloque)}
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() => setCantChalecos(Math.max(0, cantChalecos - 1))}
-                                                    disabled={cantChalecos === 0}
-                                                    className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-bold disabled:opacity-30"
-                                                >-</button>
-                                                <span className="w-6 text-center font-bold text-gray-900 dark:text-white">{cantChalecos}</span>
-                                                <button
-                                                    onClick={() => setCantChalecos(Math.min(imp.disponible, cantChalecos + 1))}
-                                                    disabled={cantChalecos >= imp.disponible}
-                                                    className="w-8 h-8 rounded-lg bg-red-600 text-white font-bold disabled:opacity-30"
-                                                >+</button>
-                                            </div>
+                                            {extender && bloqueSiguiente(selectedSlot.bloque) && (
+                                                <p className="text-[10px] font-bold text-white/80 mt-2">+ {labelBloque(bloqueSiguiente(selectedSlot.bloque)!)}</p>
+                                            )}
                                         </div>
-                                    )
-                                )}
-                            </div>
-                        )}
+                                    </div>
 
-                        <div className="flex gap-3">
-                            <button onClick={() => { setShowBookingModal(false); setSelectedSlot(null); setExtender(false) }} className="flex-1 px-4 py-4 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-2xl active:scale-[0.98] transition-transform">
-                                Cancelar
-                            </button>
-                            <button onClick={confirmBooking} className="flex-1 px-4 py-4 bg-gradient-to-r from-red-600 to-black text-white font-bold rounded-2xl active:scale-[0.98] transition-transform shadow-lg shadow-red-600/30">
-                                Confirmar
-                            </button>
+                                    {puedeExtender() && (
+                                        <button
+                                            onClick={() => setExtender(!extender)}
+                                            className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all ${extender
+                                                ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                                                : 'border-dashed border-gray-200 dark:border-gray-700 hover:border-red-300'
+                                                }`}
+                                        >
+                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${extender ? 'bg-red-600' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                                                <Plus className={extender ? 'text-white' : 'text-gray-400'} size={18} />
+                                            </div>
+                                            <div className="text-left flex-1">
+                                                <p className="text-sm font-bold text-gray-900 dark:text-white">Extender a {labelBloque(bloqueSiguiente(selectedSlot.bloque)!)}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">El siguiente bloque está libre</p>
+                                            </div>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Columna derecha: implementos */}
+                                <div className="lg:col-span-3 mb-6 lg:mb-0">
+                                    <ImplementosPicker
+                                        deporte={selectedSlot.court.sport}
+                                        fecha={format(selectedSlot.date, 'yyyy-MM-dd')}
+                                        horario={labelBloque(selectedSlot.bloque)}
+                                        onChange={setImplementosSeleccion}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button onClick={() => { setShowBookingModal(false); setSelectedSlot(null); setExtender(false) }} className="flex-1 px-4 py-4 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-2xl active:scale-[0.98] transition-transform">
+                                    Cancelar
+                                </button>
+                                <button onClick={confirmBooking} className="flex-1 px-4 py-4 bg-gradient-to-r from-red-600 to-black text-white font-bold rounded-2xl active:scale-[0.98] transition-transform shadow-lg shadow-red-600/30">
+                                    Confirmar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -817,6 +792,84 @@ export function Reservations({ user }: ReservationsProps) {
                                 className="flex-1 px-4 py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl active:scale-[0.98] transition-transform shadow-lg shadow-red-600/30"
                             >
                                 Sí, eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showDetalleModal && reservaDetalle && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end lg:items-center justify-center z-50 p-0 lg:p-4" onClick={() => setShowDetalleModal(false)}>
+                    <div className="bg-white dark:bg-[#1a1a1a] rounded-t-3xl lg:rounded-3xl w-full max-w-md max-h-[88vh] lg:max-h-[85vh] overflow-y-auto shadow-2xl border border-gray-100 dark:border-gray-800 animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+                        <div className="p-5 sm:p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white">Detalle de tu reserva</h3>
+                                <button onClick={() => setShowDetalleModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                                    <X size={20} className="text-gray-400" />
+                                </button>
+                            </div>
+
+                            {/* Ticket */}
+                            <div className="bg-gradient-to-br from-red-600 to-black rounded-2xl p-4 sm:p-5 text-white relative overflow-hidden mb-4">
+                                <div className="absolute -top-4 -right-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
+                                <div className="relative z-10">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-base">{sportEmoji(reservaDetalle.deporte)}</span>
+                                        <span className="text-[11px] font-bold uppercase tracking-wide opacity-75">{reservaDetalle.deporte}</span>
+                                        {estaEnCursoReserva(reservaDetalle.fecha, reservaDetalle.horario) && (
+                                            <span className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-full text-[9px] font-bold uppercase">
+                                                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" /> En curso
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xl sm:text-2xl font-black leading-tight">{reservaDetalle.cancha}</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 mb-4">
+                                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                                    <CalendarIcon className="text-red-600 flex-shrink-0" size={15} />
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400">Fecha</p>
+                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{format(new Date(reservaDetalle.fecha + 'T00:00:00'), 'dd MMMM yyyy', { locale: es })}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                                    <Clock className="text-red-600 flex-shrink-0" size={15} />
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400">Horario</p>
+                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{reservaDetalle.horario}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                                    <Users className="text-red-600 flex-shrink-0" size={15} />
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400">Capacidad de la cancha</p>
+                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{reservaDetalle.capacidad} jugadores</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {reservaDetalle.prestamos && reservaDetalle.prestamos.length > 0 && (
+                                <div className="mb-4">
+                                    <p className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">Equipo que llevas prestado</p>
+                                    <div className="space-y-2">
+                                        {reservaDetalle.prestamos.map((p: any) => (
+                                            <div key={p.id} className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
+                                                <span className="text-base">{iconoImplemento(p.implemento?.tipo, p.implemento?.deporte)}</span>
+                                                <p className="text-sm font-bold text-blue-700 dark:text-blue-400 flex-1">{nombreImplemento(p.implemento?.tipo, p.implemento?.deporte)}</p>
+                                                <span className="text-xs font-black text-blue-600 dark:text-blue-400">×{p.cantidad}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={() => { setShowDetalleModal(false); pedirConfirmacionCard(reservaDetalle) }}
+                                className="w-full py-3.5 text-sm font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-2xl active:scale-[0.98] transition-transform"
+                            >
+                                Cancelar esta reserva
                             </button>
                         </div>
                     </div>
